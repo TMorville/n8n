@@ -1,0 +1,22 @@
+# Environment variables
+.env
+
+# n8n data (if running locally)
+n8n_data/
+
+# Backups
+backup*.json
+*.sqlite
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log

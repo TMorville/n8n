@@ -1,0 +1,38 @@
+_metadata:
+  major_version: 2
+  minor_version: 1
+display_information:
+  name: LegacyAI
+  description: AI assistant for searching and managing Notion documentation
+  background_color: "#4A154B"
+features:
+  bot_user:
+    display_name: LegacyAI
+    always_online: true
+  shortcuts:
+    - name: Add to Notion
+      type: message
+      callback_id: add_to_notion
+      description: Summarize this thread and add it to Notion
+oauth_config:
+  scopes:
+    bot:
+      - app_mentions:read
+      - channels:history
+      - chat:write
+      - commands
+      - groups:history
+      - users:read
+  redirect_urls:
+    - https://n8n.legacyco2.com/oauth/callback
+settings:
+  event_subscriptions:
+    request_url: https://n8n.legacyco2.com/webhook/legacy-ai
+    bot_events:
+      - app_mention
+  interactivity:
+    is_enabled: true
+    request_url: https://n8n.legacyco2.com/webhook/add-to-notion
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

@@ -1,0 +1,302 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "add-to-notion",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "19e865b4-7732-4d84-958f-415bd5eb415e",
+      "name": "Webhook",
+      "webhookId": "0dc60013-7c8d-4b47-a9c4-f2085822306c"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        208,
+        0
+      ],
+      "id": "98763418-5699-4f3f-b747-ecd6f50d1747",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\n// Parse the form-encoded payload\nconst data = JSON.parse(input.body.payload);\n\n// Extract from message shortcut payload\nconst message = data.message;\nconst threadTs = message.thread_ts || message.ts;\nconst channelId = data.channel.id;\nconst channelName = data.channel.name;\nconst userId = data.user.id;\nconst responseUrl = data.response_url;\n\n// Check if message is in a thread (has replies)\nif (!message.reply_count && !message.thread_ts) {\n  return [{\n    json: {\n      error: 'Not a thread message',\n      responseUrl: responseUrl\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    threadTs,\n    channelId,\n    channelName,\n    userId,\n    responseUrl\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "3b3d5748-a5d8-4ba7-8f45-7d65da57d2ed",
+      "name": "Extract Thread Info"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/conversations.replies",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "={{ $json.channelId }}"
+            },
+            {
+              "name": "ts",
+              "value": "={{ $json.threadTs }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        624,
+        0
+      ],
+      "id": "19a4cad7-a4b1-46d2-9135-44aba9ff0b8d",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wKGpeVhoWDqwY4IS",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\n// Check if Slack API call was successful\nif (!response.ok) {\n  throw new Error(`Slack API error: ${response.error || 'Unknown error'}`);\n}\n\nconst messages = response.messages;\n\nif (!messages || !Array.isArray(messages)) {\n  throw new Error('No messages found in response');\n}\n\n// Format messages with timestamps\nconst formattedMessages = messages.map(msg => {\n  const timestamp = new Date(parseFloat(msg.ts) * 1000).toLocaleString('en-US', {\n    timeZone: 'Europe/Copenhagen',\n    dateStyle: 'short',\n    timeStyle: 'short'\n  });\n  const userId = msg.user;\n  const text = msg.text;\n  return `[${timestamp}] User ${userId}: ${text}`;\n}).join('\\n\\n');\n\nreturn [{\n  json: {\n    threadText: formattedMessages,\n    messageCount: messages.length,\n    responseUrl: $('Extract Thread Info').first().json.responseUrl\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        0
+      ],
+      "id": "52f33582-be69-45f9-836c-ec74ca0ca9e4",
+      "name": "Format Thread for Claude"
+    },
+    {
+      "parameters": {
+        "jsCode": "const threadText = $input.first().json.threadText;\nconst channelName = $(\"Extract Thread Info\").first().json.channelName;\n\nreturn [\n  {\n    json: {\n      model: \"claude-sonnet-4-20250514\",\n      max_tokens: 4000,\n      tools: [\n        {\n          name: \"create_notion_page\",\n          description:\n            \"Create a well-structured page in Notion with the thread summary\",\n          input_schema: {\n            type: \"object\",\n            properties: {\n              title: {\n                type: \"string\",\n                description: \"A clear, descriptive title for the page\",\n              },\n              content: {\n                type: \"string\",\n                description:\n                  \"The formatted content in Notion-flavored Markdown\",\n              },\n            },\n            required: [\"title\", \"content\"],\n          },\n        },\n      ],\n      messages: [\n        {\n          role: \"user\",\n          content: `Analyze this Slack thread from #${channelName} and create a well-structured Notion page summarizing it. Use the create_notion_page tool.\\n\\nThread:\\n${threadText}`,\n        },\n      ],\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "2450506b-5bf8-4447-a8a2-a75e200e56c2",
+      "name": "Build Claude Request"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1248,
+        0
+      ],
+      "id": "ca76cc9d-07a2-46e0-8e26-ba783ef8c4e4",
+      "name": "Claude API Call",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "gu04rFS1KUubizmj",
+          "name": "Header Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "endpointUrl": "https://mcp.notion.com/mcp",
+        "authentication": "mcpOAuth2Api",
+        "tool": {
+          "__rl": true,
+          "value": "notion-create-pages",
+          "mode": "list",
+          "cachedResultName": "notion-create-pages"
+        },
+        "inputMode": "json",
+        "jsonInput": "={{ $json }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpClient",
+      "typeVersion": 1,
+      "position": [
+        1664,
+        0
+      ],
+      "id": "3f514e55-dc0d-41f8-84c3-f950b36ae7ae",
+      "name": "MCP Client",
+      "credentials": {
+        "mcpOAuth2Api": {
+          "id": "XIkxOa43ADR9R2Fv",
+          "name": "MCP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "  const claudeResponse = $input.first().json;\n  const toolUseBlock = claudeResponse.content.find(block =>\n  block.type === 'tool_use');\n\nif (!toolUseBlock) {\n  throw new Error(\"Claude did not return a tool call\");\n}\n\n  const responseUrl = $('Build Claude Request').first().json.responseUrl;\n\nreturn [\n  {\n    json: {\n      parent: {\n        database_id: \"27174f4c920280c3b266f3714a5723b9\",\n      },\n      pages: [\n        {\n          properties: {\n            title: toolUseBlock.input.title  // Just the title string in markdown\n          },\n          content: toolUseBlock.input.content  // Notion-flavored Markdown\n        }\n      ],\n      responseUrl: responseUrl,\n    },\n  },\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        0
+      ],
+      "id": "820e66b7-7ff0-4bb4-a0c5-724a5d63f428",
+      "name": "Extract Tool Call"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Thread Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Thread Info": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Format Thread for Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Thread for Claude": {
+      "main": [
+        [
+          {
+            "node": "Build Claude Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Claude Request": {
+      "main": [
+        [
+          {
+            "node": "Claude API Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude API Call": {
+      "main": [
+        [
+          {
+            "node": "Extract Tool Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Tool Call": {
+      "main": [
+        [
+          {
+            "node": "MCP Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "efb78d8c-b3f6-4fdb-95f6-f76f9a969eae",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2231067a0b740718af5322594b1a5d19b2232512729860c8a4494e2f31825162"
+  },
+  "id": "aRFV1m9NRqwPEejY",
+  "tags": []
+}

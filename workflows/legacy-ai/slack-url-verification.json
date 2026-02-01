@@ -1,0 +1,25 @@
+{
+  "name": "Slack URL Verification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "legacy-ai",
+        "responseMode": "onReceived",
+        "options": {
+          "responseData": "={{ { challenge: $json.body.challenge } }}"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "webhook-verification",
+      "name": "Webhook",
+      "webhookId": "slack-verification-001"
+    }
+  ],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

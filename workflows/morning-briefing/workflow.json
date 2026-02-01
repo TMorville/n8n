@@ -1,0 +1,798 @@
+{
+  "updatedAt": "2026-01-31T15:43:41.926Z",
+  "createdAt": "2026-01-30T18:48:31.356Z",
+  "id": "gT2Q9DU9JWa7NTJj",
+  "name": "Morning Briefing Podcast",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 304],
+      "notes": "Runs Mon-Fri at 6:00 AM"
+    },
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 512],
+      "notes": "For testing"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [224, 400]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "primary"
+        },
+        "returnAll": true,
+        "options": {
+          "timeMin": "={{ $now.startOf('day').toISO() }}",
+          "timeMax": "={{ $now.endOf('day').toISO() }}",
+          "singleEvents": true,
+          "orderBy": "startTime"
+        }
+      },
+      "id": "google-calendar",
+      "name": "Google Calendar",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [464, 112],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "2Ap7swo3KCsSTLUf",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 20,
+        "filters": {
+          "includeSpamTrash": false,
+          "q": "is:unread newer_than:7d category:primary -from:noreply -from:no-reply -from:calendar-notification -from:stripe.com -from:todoist.com -subject:\"your receipt\" -subject:\"accepted:\" -subject:\"declined:\""
+        }
+      },
+      "id": "gmail",
+      "name": "Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [464, 272],
+      "webhookId": "1635e4bd-a40e-4216-9d95-f6deb8b48cdc",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "0y5YjfHHjcDNipgA",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "search",
+        "query": "in:#general OR in:#engineering",
+        "limit": 30,
+        "options": {}
+      },
+      "id": "slack",
+      "name": "Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [464, 432],
+      "webhookId": "8d3b1943-4d00-4ef9-bad5-538d0036bc1a",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "Zd14IildZOr6iOl1",
+          "name": "Slack account 2"
+        }
+      },
+      "notes": "Gets DMs and mentions. Configure channel list as needed."
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "filter": "today | overdue"
+        }
+      },
+      "id": "todoist",
+      "name": "Todoist",
+      "type": "n8n-nodes-base.todoist",
+      "typeVersion": 2.1,
+      "position": [464, 592],
+      "credentials": {
+        "todoistApi": {
+          "id": "3UCpIsn01iEhYil8",
+          "name": "Todoist account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "5f257de4ca18494b8f0be7ca61a030ee"
+        },
+        "limit": 20,
+        "options": {
+          "sort": {
+            "sortValue": [
+              {
+                "timestamp": true,
+                "key": "last_edited_time",
+                "direction": "descending"
+              }
+            ]
+          }
+        }
+      },
+      "id": "notion",
+      "name": "Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [464, 752],
+      "credentials": {
+        "notionApi": {
+          "id": "vIKUs0z0jHA1B6Bx",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Gets pages updated in the last week from configured database"
+    },
+    {
+      "parameters": {
+        "maxItems": 5
+      },
+      "id": "limit-notion",
+      "name": "Limit Notion Pages",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [632, 752],
+      "notes": "Limit to 5 most recent pages"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare input for MCP notion-fetch - process each item\nconst items = $input.all();\nreturn items.map(item => ({\n  json: {\n    ...item.json,\n    mcpInput: {\n      id: item.json.id,\n      type: \"page\"\n    }\n  }\n}));"
+      },
+      "id": "prepare-mcp-input",
+      "name": "Prepare MCP Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 752]
+    },
+    {
+      "parameters": {
+        "endpointUrl": "https://mcp.notion.com/mcp",
+        "authentication": "mcpOAuth2Api",
+        "tool": {
+          "__rl": true,
+          "value": "notion-fetch",
+          "mode": "list",
+          "cachedResultName": "notion-fetch"
+        },
+        "inputMode": "json",
+        "jsonInput": "={{ JSON.stringify($json.mcpInput) }}",
+        "options": {}
+      },
+      "id": "mcp-notion-fetch",
+      "name": "MCP Notion Fetch",
+      "type": "@n8n/n8n-nodes-langchain.mcpClient",
+      "typeVersion": 1,
+      "position": [968, 752],
+      "credentials": {
+        "mcpOAuth2Api": {
+          "id": "XIkxOa43ADR9R2Fv",
+          "name": "MCP account"
+        }
+      },
+      "notes": "Fetches page content via Notion MCP"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract content from MCP response - process all items\nconst items = $input.all();\n\nreturn items.map(item => {\n  const mcpResult = item.json;\n  \n  // MCP returns: { content: [{ type: 'text', text: { title, url, text, metadata } }] }\n  let content = '';\n  let title = '';\n  let url = '';\n  \n  if (mcpResult.content && Array.isArray(mcpResult.content)) {\n    for (const c of mcpResult.content) {\n      if (c.type === 'text' && c.text) {\n        const textObj = c.text;\n        if (typeof textObj === 'string') {\n          content = textObj;\n        } else {\n          // Extract from nested structure\n          title = textObj.title || title;\n          url = textObj.url || url;\n          content = textObj.text || content;\n        }\n      }\n    }\n  }\n  \n  // Limit content length\n  content = String(content || '').substring(0, 1500);\n  \n  return {\n    json: {\n      title: title || '(Untitled)',\n      url: url || '',\n      content: content || '(No content extracted)'\n    }\n  };\n});"
+      },
+      "id": "process-mcp-result",
+      "name": "Process MCP Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1136, 752],
+      "notes": "Extract content from MCP response"
+    },
+    {
+      "parameters": {
+        "numberInputs": 5
+      },
+      "id": "merge",
+      "name": "Merge Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [880, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format all gathered data for Claude prompt\nconst calendar = $('Google Calendar').all();\nconst emails = $('Gmail').all();\nconst slack = $('Slack').all();\nconst tasks = $('Todoist').all();\nconst notion = $('Process MCP Result').all();\n\n// Stale task detection constants\nconst STALE_DAYS = 7;\nconst today = new Date();\n\n// Format calendar events and calculate duration\nconst calendarData = calendar.map(e => {\n  const start = e.json.start?.dateTime || e.json.start?.date;\n  const end = e.json.end?.dateTime || e.json.end?.date;\n  return {\n    title: e.json.summary || 'No title',\n    start,\n    end,\n    location: e.json.location || null\n  };\n});\n\n// Calculate calendar load (minutes)\nconst calendarMinutes = calendarData.reduce((sum, e) => {\n  if (!e.start || !e.end) return sum;\n  const startDate = new Date(e.start);\n  const endDate = new Date(e.end);\n  // Skip all-day events (no time component)\n  if (e.start.length <= 10) return sum;\n  return sum + (endDate - startDate) / 60000;\n}, 0);\n\n// Format emails - handle different Gmail response formats\nconst emailData = emails.map(e => {\n  const headers = e.json.payload?.headers || [];\n  const getHeader = (name) => headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value;\n  \n  return {\n    from: getHeader('From') || e.json.from || 'Unknown',\n    subject: getHeader('Subject') || e.json.subject || 'No subject',\n    snippet: e.json.snippet || '',\n    isImportant: e.json.labelIds?.includes('IMPORTANT'),\n    isStarred: e.json.labelIds?.includes('STARRED')\n  };\n});\n\n// Format Slack messages\nconst slackData = slack.filter(m => m.json.text).map(m => ({\n  channel: m.json.channel?.name || 'DM',\n  sender: m.json.user_profile?.real_name || m.json.user || 'Unknown',\n  text: m.json.text || ''\n}));\n\n// Format Todoist tasks with staleness detection\nconst taskData = tasks.map(t => {\n  const created = t.json.created_at ? new Date(t.json.created_at) : null;\n  const ageInDays = created ? Math.floor((today - created) / 86400000) : null;\n\n  return {\n    content: t.json.content,\n    due: t.json.due?.date || 'Today',\n    priority: t.json.priority,\n    ageInDays,\n    isStale: ageInDays !== null && ageInDays >= STALE_DAYS\n  };\n});\n\n// Count stale tasks\nconst staleTaskCount = taskData.filter(t => t.isStale).length;\n\n// Format Notion pages with content from MCP\nconst notionData = notion.map(n => ({\n  title: n.json.title || 'Untitled',\n  url: n.json.url,\n  content: n.json.content || ''\n}));\n\nconst dateStr = today.toLocaleDateString('en-US', {\n  weekday: 'long',\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric'\n});\n\n// Capacity calculation\nconst WORKDAY = 480; // 8 hours in minutes\nconst taskMinutes = taskData.length * 30; // estimate 30 min/task\nconst loadPercent = Math.round(((calendarMinutes + taskMinutes) / WORKDAY) * 100);\n\nreturn {\n  json: {\n    date: dateStr,\n    calendar: calendarData,\n    emails: emailData,\n    slack: slackData,\n    tasks: taskData,\n    recentNotes: notionData,\n    stats: {\n      eventCount: calendarData.length,\n      emailCount: emailData.length,\n      slackCount: slackData.length,\n      taskCount: taskData.length,\n      staleTaskCount,\n      noteCount: notionData.length\n    },\n    capacity: {\n      calendarMinutes,\n      taskMinutes,\n      loadPercent,\n      isOverCapacity: loadPercent > 80\n    }\n  }\n};"
+      },
+      "id": "format-data",
+      "name": "Format Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1056, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.parse($json.requestBody) }}",
+        "options": {}
+      },
+      "id": "claude-api",
+      "name": "Claude API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "gu04rFS1KUubizmj",
+          "name": "Claude API key"
+        }
+      },
+      "notes": "Generates briefing script using Claude claude-sonnet-4-20250514"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the script text from Claude's response\n\nconst response = $input.first().json;\n\nlet scriptText = '';\nlet inputTokens = 0;\nlet outputTokens = 0;\n\nif (response.content && Array.isArray(response.content)) {\n  scriptText = response.content\n    .filter(block => block.type === 'text')\n    .map(block => block.text)\n    .join('\\n\\n');\n  inputTokens = response.usage?.input_tokens || 0;\n  outputTokens = response.usage?.output_tokens || 0;\n} else if (response.text) {\n  scriptText = response.text;\n} else if (typeof response === 'string') {\n  scriptText = response;\n}\n\n// Clean up for TTS\nscriptText = scriptText\n  .replace(/^#+ /gm, '')\n  .replace(/\\*\\*/g, '')\n  .replace(/\\*/g, '')\n  .replace(/`/g, '')\n  .replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, '$1')\n  .trim();\n\nconst wordCount = scriptText.split(/\\s+/).length;\n// Faster pace for direct delivery: 160 wpm\nconst estimatedMinutes = Math.round(wordCount / 160);\n\nconst today = new Date();\nconst episodeDate = today.toISOString().split('T')[0];\n// Updated title for briefing style\nconst episodeTitle = `Briefing - ${episodeDate}`;\n\nconst firstParagraph = scriptText.split('\\n\\n')[0] || '';\nconst description = firstParagraph.substring(0, 200) + (firstParagraph.length > 200 ? '...' : '');\n\nreturn {\n  json: {\n    script: scriptText,\n    wordCount,\n    estimatedMinutes,\n    episodeTitle,\n    episodeDate,\n    description,\n    usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens }\n  }\n};"
+      },
+      "id": "extract-script",
+      "name": "Extract Script",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1632, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "audio/mpeg"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify($json.script) }},\n  \"model_id\": \"eleven_multilingual_v2\",\n  \"voice_settings\": {\n    \"stability\": 0.5,\n    \"similarity_boost\": 0.75,\n    \"style\": 0.5,\n    \"use_speaker_boost\": true\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "elevenlabs-tts",
+      "name": "ElevenLabs TTS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1792, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "QUVrU7I55RQ8mhTR",
+          "name": "ElevenLabs API"
+        }
+      },
+      "notes": "Converts script to MP3 audio"
+    },
+    {
+      "parameters": {
+        "resource": "object",
+        "operation": "create",
+        "bucketName": "morning-briefing-podcast-dev",
+        "objectName": "=episodes/{{ $('Extract Script').first().json.episodeDate }}-briefing.mp3",
+        "createData": {},
+        "createQuery": {},
+        "encryptionHeaders": {},
+        "requestOptions": {}
+      },
+      "id": "upload-mp3",
+      "name": "Upload MP3",
+      "type": "n8n-nodes-base.googleCloudStorage",
+      "typeVersion": 1,
+      "position": [1984, 400],
+      "credentials": {
+        "googleCloudStorageOAuth2Api": {
+          "id": "mUq2jQi5KHAHHb8R",
+          "name": "Google Cloud Storage account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "object",
+        "operation": "get",
+        "bucketName": "morning-briefing-podcast-dev",
+        "objectName": "feed.xml",
+        "getParameters": {},
+        "encryptionHeaders": {},
+        "requestOptions": {}
+      },
+      "id": "download-rss",
+      "name": "Download RSS",
+      "type": "n8n-nodes-base.googleCloudStorage",
+      "typeVersion": 1,
+      "position": [2160, 400],
+      "credentials": {
+        "googleCloudStorageOAuth2Api": {
+          "id": "mUq2jQi5KHAHHb8R",
+          "name": "Google Cloud Storage account"
+        }
+      },
+      "continueOnFail": true,
+      "notes": "Downloads existing feed.xml or fails gracefully if not exists"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Update RSS feed with new episode\n// See nodes/03-update-rss.js for full implementation\n\nconst existingFeed = $('Download RSS').first();\nconst episode = $('Extract Script').first().json;\nconst config = $('Config').first().json;\nconst mp3Upload = $('Upload MP3').first().json;\n\nconst mp3Url = mp3Upload.mediaLink || \n  `https://storage.googleapis.com/${config.gcsBucket}/episodes/${episode.episodeDate}-briefing.mp3`;\nconst fileSize = mp3Upload.size || 0;\nconst pubDate = new Date().toUTCString();\n\nfunction escapeXml(str) {\n  return String(str)\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;')\n    .replace(/\"/g, '&quot;')\n    .replace(/'/g, '&apos;');\n}\n\nfunction getEpisodeNumber() {\n  const startDate = new Date('2026-01-01');\n  const today = new Date();\n  return Math.floor((today - startDate) / (1000 * 60 * 60 * 24)) + 1;\n}\n\nconst newEpisode = `    <item>\n      <title>${escapeXml(episode.episodeTitle)}</title>\n      <description><![CDATA[${episode.description}]]></description>\n      <enclosure url=\"${mp3Url}\" length=\"${fileSize}\" type=\"audio/mpeg\"/>\n      <guid isPermaLink=\"true\">${mp3Url}</guid>\n      <pubDate>${pubDate}</pubDate>\n      <itunes:duration>${episode.estimatedMinutes * 60}</itunes:duration>\n      <itunes:episode>${getEpisodeNumber()}</itunes:episode>\n    </item>`;\n\nlet feedXml = '';\n\n// Check if we got existing feed data\nlet existingData = '';\nif (existingFeed.json?.data) {\n  existingData = existingFeed.json.data;\n} else if (existingFeed.binary?.data) {\n  existingData = Buffer.from(existingFeed.binary.data.data, 'base64').toString('utf8');\n}\n\nif (existingData && existingData.includes('<channel>')) {\n  feedXml = existingData;\n  const itemMatch = feedXml.match(/<item>/);\n  const channelEndMatch = feedXml.match(/<\\/channel>/);\n  \n  if (itemMatch) {\n    const insertPos = itemMatch.index;\n    feedXml = feedXml.slice(0, insertPos) + newEpisode + '\\n' + feedXml.slice(insertPos);\n  } else if (channelEndMatch) {\n    const insertPos = channelEndMatch.index;\n    feedXml = feedXml.slice(0, insertPos) + newEpisode + '\\n  ' + feedXml.slice(insertPos);\n  }\n  \n  feedXml = feedXml.replace(\n    /<lastBuildDate>[^<]*<\\/lastBuildDate>/,\n    `<lastBuildDate>${pubDate}</lastBuildDate>`\n  );\n} else {\n  // Create new feed\n  feedXml = `<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rss version=\"2.0\"\n     xmlns:itunes=\"http://www.itunes.com/dtds/podcast-1.0.dtd\"\n     xmlns:content=\"http://purl.org/rss/1.0/modules/content/\"\n     xmlns:atom=\"http://www.w3.org/2005/Atom\">\n  <channel>\n    <title>${escapeXml(config.podcastTitle || 'My Morning Briefing')}</title>\n    <description>${escapeXml(config.podcastDescription || 'Personal daily morning briefing podcast')}</description>\n    <link>https://storage.googleapis.com/${config.gcsBucket}/</link>\n    <language>en-us</language>\n    <lastBuildDate>${pubDate}</lastBuildDate>\n    <atom:link href=\"https://storage.googleapis.com/${config.gcsBucket}/feed.xml\" rel=\"self\" type=\"application/rss+xml\"/>\n    <itunes:author>${escapeXml(config.userName || 'Morning Briefing')}</itunes:author>\n    <itunes:summary>${escapeXml(config.podcastDescription || 'Personal daily morning briefing podcast')}</itunes:summary>\n    <itunes:category text=\"Daily News\"/>\n    <itunes:explicit>false</itunes:explicit>\n    <itunes:image href=\"https://storage.googleapis.com/${config.gcsBucket}/cover.jpg\"/>\n${newEpisode}\n  </channel>\n</rss>`;\n}\n\nreturn {\n  json: {\n    feedXml,\n    episodeAdded: episode.episodeTitle,\n    mp3Url\n  }\n};"
+      },
+      "id": "update-rss",
+      "name": "Update RSS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2368, 400]
+    },
+    {
+      "parameters": {
+        "resource": "object",
+        "operation": "create",
+        "bucketName": "morning-briefing-podcast-dev",
+        "objectName": "feed.xml",
+        "createData": {},
+        "createQuery": {},
+        "encryptionHeaders": {},
+        "requestOptions": {}
+      },
+      "id": "upload-rss",
+      "name": "Upload RSS",
+      "type": "n8n-nodes-base.googleCloudStorage",
+      "typeVersion": 1,
+      "position": [2816, 400],
+      "credentials": {
+        "googleCloudStorageOAuth2Api": {
+          "id": "mUq2jQi5KHAHHb8R",
+          "name": "Google Cloud Storage account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert feed XML string to binary for GCS upload\nconst feedXml = $input.first().json.feedXml;\nconst episodeAdded = $input.first().json.episodeAdded;\nconst mp3Url = $input.first().json.mp3Url;\n\n// Create binary data from the XML string\nconst binaryData = Buffer.from(feedXml, 'utf8');\n\nreturn {\n  json: {\n    episodeAdded,\n    mp3Url,\n    feedSize: binaryData.length\n  },\n  binary: {\n    data: {\n      data: binaryData.toString('base64'),\n      mimeType: 'application/rss+xml',\n      fileName: 'feed.xml'\n    }\n  }\n};"
+      },
+      "id": "prepare-rss-upload",
+      "name": "Prepare RSS Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2592, 400]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "output",
+      "name": "Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [3040, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare the Claude API request body with proper JSON escaping\nconst data = $input.first().json;\nconst config = $('Config').first().json;\n\nconst systemPrompt = `You are Tobias's personal assistant giving him his morning briefing.\n\nABOUT TOBIAS:\n- CTO at Legacy, a climate tech startup in Denmark\n- Engineering team: Lars, Matei, Divine, Shelby, Chris, Daniel\n- Key projects: BEC (banking), Danica (insurance), Platform\n- Stakeholders: Magnus (CEO), Mathias, Rune, Christoffer\n\nYOUR STYLE:\n- Speak like a capable, thoughtful PA who knows Tobias well\n- Warm but efficient - no fluff, but not robotic either\n- Use natural phrases like \"I'd suggest...\", \"Worth noting...\", \"Quick thing...\"\n- Connect the dots between items when relevant\n- Be honest about concerns or risks\n\nSTRUCTURE (400-600 words, 3-4 minutes spoken):\n\nOpen with a one-sentence summary of the day's shape - busy, light, or blocked by something.\n\nThen cover what matters:\n\nPriorities - the 1-3 things that will move the needle today. For each, explain why it matters now and suggest a first step.\n\nAnything stuck - tasks over 7 days old, blockers, things slipping. Be direct about the risk of leaving them.\n\nCalendar - only mention meetings that need prep or seem unclear. Skip routine standups.\n\nMessages worth attention - emails or Slack that need a reply or decision. Summarize noise briefly: \"You've got some GitHub notifications and bot messages, nothing urgent.\"\n\nClose with a quick capacity check - if the day looks overloaded, say so. Otherwise, \"You should have room to breathe.\"\n\nFILTERING:\n- Prioritize messages from people over automated notifications\n- Skip bot messages, system alerts, marketing emails entirely\n- Always flag: deadlines, direct questions, blockers\n\nRULES:\n- No markdown, bullets, or formatting - this is spoken\n- Section headers as single words followed by a pause\n- Use \"...\" for natural pauses\n- Skip empty sections\n- Numbers: \"first\" not \"1\", \"eighty percent\" not \"80%\"\n- End with something useful, not a generic sign-off`;\n\nconst userMessage = `Today: ${data.date}\n\nCALENDAR (${data.stats.eventCount} events, ${data.capacity.loadPercent}% of day):\n${JSON.stringify(data.calendar, null, 2)}\n\nEMAILS (${data.stats.emailCount} messages):\n${JSON.stringify(data.emails, null, 2)}\n\nSLACK (${data.stats.slackCount} messages):\n${JSON.stringify(data.slack, null, 2)}\n\nTASKS (${data.stats.taskCount} total, ${data.stats.staleTaskCount} stale):\n${JSON.stringify(data.tasks, null, 2)}\n\nNOTION NOTES (${data.stats.noteCount} recent):\n${JSON.stringify(data.recentNotes, null, 2)}\n\nCAPACITY: ${data.capacity.loadPercent}%${data.capacity.isOverCapacity ? ' - OVER 80%' : ''}\n\nGenerate the briefing.`;\n\nconst requestBody = {\n  model: \"claude-sonnet-4-20250514\",\n  max_tokens: 4096,\n  system: systemPrompt,\n  messages: [\n    {\n      role: \"user\",\n      content: userMessage\n    }\n  ]\n};\n\nreturn {\n  json: {\n    requestBody: JSON.stringify(requestBody),\n    ...data\n  }\n};"
+      },
+      "id": "prepare-claude",
+      "name": "Prepare Claude Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1264, 400]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Google Calendar",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slack",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Todoist",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Slack": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Todoist": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Notion": {
+      "main": [
+        [
+          {
+            "node": "Limit Notion Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit Notion Pages": {
+      "main": [
+        [
+          {
+            "node": "Prepare MCP Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare MCP Input": {
+      "main": [
+        [
+          {
+            "node": "MCP Notion Fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP Notion Fetch": {
+      "main": [
+        [
+          {
+            "node": "Process MCP Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process MCP Result": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Merge Data": {
+      "main": [
+        [
+          {
+            "node": "Format Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Data": {
+      "main": [
+        [
+          {
+            "node": "Prepare Claude Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude API": {
+      "main": [
+        [
+          {
+            "node": "Extract Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Script": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs TTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs TTS": {
+      "main": [
+        [
+          {
+            "node": "Upload MP3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload MP3": {
+      "main": [
+        [
+          {
+            "node": "Download RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download RSS": {
+      "main": [
+        [
+          {
+            "node": "Update RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update RSS": {
+      "main": [
+        [
+          {
+            "node": "Prepare RSS Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare RSS Upload": {
+      "main": [
+        [
+          {
+            "node": "Upload RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload RSS": {
+      "main": [
+        [
+          {
+            "node": "Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Claude Request": {
+      "main": [
+        [
+          {
+            "node": "Claude API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "b27545f6-daa7-47c7-8461-e198be0ce506",
+  "activeVersionId": null,
+  "versionCounter": 33,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-01-30T18:48:31.413Z",
+      "createdAt": "2026-01-30T18:48:31.413Z",
+      "role": "workflow:owner",
+      "workflowId": "gT2Q9DU9JWa7NTJj",
+      "projectId": "HgE3PS7CWAax4tAn",
+      "project": {
+        "updatedAt": "2025-12-10T11:55:26.036Z",
+        "createdAt": "2025-12-10T11:13:20.377Z",
+        "id": "HgE3PS7CWAax4tAn",
+        "name": "Tobias Morville <tm@legacyco2.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "updatedAt": "2025-12-10T11:13:20.377Z",
+            "createdAt": "2025-12-10T11:13:20.377Z",
+            "userId": "63c71389-1398-4a2d-a012-514a099b0a18",
+            "projectId": "HgE3PS7CWAax4tAn",
+            "user": {
+              "updatedAt": "2026-01-31T06:00:06.000Z",
+              "createdAt": "2025-12-10T11:13:15.161Z",
+              "id": "63c71389-1398-4a2d-a012-514a099b0a18",
+              "email": "tm@legacyco2.com",
+              "firstName": "Tobias",
+              "lastName": "Morville",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-12-10T11:55:31.406Z",
+                "personalization_survey_n8n_version": "1.123.4"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "aRFV1m9NRqwPEejY",
+                "userActivatedAt": 1765374957874,
+                "easyAIWorkflowOnboarded": true,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1766131786818
+                }
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2026-01-31",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}
