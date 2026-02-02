@@ -142,6 +142,10 @@
         720,
         512
       ],
+      "continueOnFail": true,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
       "credentials": {
         "httpHeaderAuth": {
           "id": "gu04rFS1KUubizmj",
@@ -741,6 +745,10 @@
         1680,
         960
       ],
+      "continueOnFail": true,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
       "credentials": {
         "httpHeaderAuth": {
           "id": "QUVrU7I55RQ8mhTR",
@@ -767,6 +775,7 @@
         1920,
         960
       ],
+      "continueOnFail": true,
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 5000,
@@ -851,6 +860,7 @@
         2864,
         960
       ],
+      "continueOnFail": true,
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 3000,
@@ -919,6 +929,81 @@
         }
       },
       "notes": "Save briefing to Notion"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Check for Errors - Detect upstream failures and prepare alert data\n */\nconst ttsResult = $('ElevenLabs TTS').first();\nconst uploadMp3Result = $('Upload MP3').first();\nconst extractBriefing = $('Extract Briefing').first().json;\n\nconst errors = [];\n\n// Check TTS errors\nif (ttsResult.json?.error || !ttsResult.binary?.data) {\n  errors.push({\n    step: 'ElevenLabs TTS',\n    message: ttsResult.json?.error?.message || ttsResult.json?.message || 'Failed to generate audio'\n  });\n}\n\n// Check MP3 upload errors\nif (uploadMp3Result.json?.error) {\n  errors.push({\n    step: 'Upload MP3',\n    message: uploadMp3Result.json?.error?.message || 'Failed to upload MP3 to GCS'\n  });\n}\n\n// Check for workflow-level errors (timeout, max iterations)\nif (extractBriefing.exitReason === 'timeout' || extractBriefing.exitReason === 'max_iterations_reached') {\n  errors.push({\n    step: 'Agent Loop',\n    message: `Workflow ended due to: ${extractBriefing.exitReason}`\n  });\n}\n\nif (errors.length > 0) {\n  const errorSummary = errors.map(e => `• *${e.step}*: ${e.message}`).join('\\n');\n  return [{\n    json: {\n      hasError: true,\n      errorCount: errors.length,\n      errors,\n      errorSummary,\n      timestamp: new Date().toISOString()\n    }\n  }];\n}\n\n// No errors - pass through success data\nreturn [{\n  json: {\n    hasError: false,\n    episodeTitle: extractBriefing.episodeTitle,\n    mp3Url: uploadMp3Result.json?.mediaLink || 'Unknown'\n  }\n}];"
+      },
+      "id": "check-errors",
+      "name": "Check Errors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        1200
+      ],
+      "notes": "Detect upstream failures"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-error",
+              "leftValue": "={{ $json.hasError }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-error",
+      "name": "Has Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2400,
+        1200
+      ],
+      "notes": "Route errors to Slack"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "U09CHAFQ9UP"
+        },
+        "text": "=:warning: *Morning Briefing Failed*\n\n{{ $json.errorSummary }}\n\n*Time:* {{ $now.format('HH:mm') }}\n\nCheck n8n execution logs for details.",
+        "otherOptions": {}
+      },
+      "id": "slack-error-alert",
+      "name": "Slack Error Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        2640,
+        1120
+      ],
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "Zd14IildZOr6iOl1",
+          "name": "Slack account 2"
+        }
+      },
+      "notes": "Alert Tobias on failure"
     }
   ],
   "connections": {
@@ -1383,8 +1468,36 @@
             "node": "Output",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Check Errors",
+            "type": "main",
+            "index": 0
           }
         ]
+      ]
+    },
+    "Check Errors": {
+      "main": [
+        [
+          {
+            "node": "Has Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Error?": {
+      "main": [
+        [
+          {
+            "node": "Slack Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },
