@@ -12,6 +12,7 @@
 | Morning Briefing Podcast | `gT2Q9DU9JWa7NTJj` |
 | Morning Briefing Podcast (Agentic) | `W2wCHCcyQXP7tyX8` |
 | LegacyAI (Simplified) | `PbAALWXhBoybT8YA` |
+| Website Monitor - Copenhagen Wedding | `yMjwt2RlVygKcRPI` |
 
 ### Uploading Workflows
 
