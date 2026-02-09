@@ -356,7 +356,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Prepare for Calendar - store tool call info\nconst toolCall = $input.first().json;\nreturn [{ json: { _toolCall: toolCall } }];"
+        "jsCode": "// Prepare for Calendar - store all tool call info (Pattern A: API-based)\nconst items = $input.all();\nreturn [{ json: { _toolCalls: items.map(i => i.json) } }];"
       },
       "id": "prepare-calendar",
       "name": "Prepare Calendar",
@@ -401,7 +401,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const events = $input.all();\nconst toolCall = $('Prepare Calendar').first().json._toolCall;\nconst today = new Date();\ntoday.setHours(0, 0, 0, 0);\n\nconst formatted = events.map(e => {\n  const startStr = e.json.start?.dateTime || e.json.start?.date;\n  const startDate = startStr ? new Date(startStr) : null;\n  const dayOfWeek = startDate ? startDate.toLocaleDateString('en-US', { weekday: 'long' }) : null;\n  const dateOnly = startDate ? startDate.toISOString().split('T')[0] : null;\n  const eventDay = startDate ? new Date(startDate) : null;\n  if (eventDay) eventDay.setHours(0, 0, 0, 0);\n  const isToday = eventDay && eventDay.getTime() === today.getTime();\n  return {\n    title: e.json.summary || 'No title',\n    start: startStr,\n    end: e.json.end?.dateTime || e.json.end?.date,\n    date: dateOnly,\n    dayOfWeek,\n    isToday,\n    location: e.json.location || null,\n    attendees: (e.json.attendees || []).map(a => a.email).slice(0, 5)\n  };\n});\n\nconst todayEvents = formatted.filter(e => e.isToday);\nconst laterEvents = formatted.filter(e => !e.isToday);\n\nreturn [{ json: { toolCallId: toolCall.id, toolName: 'get-calendar-events', result: { totalEventCount: formatted.length, todayEventCount: todayEvents.length, laterThisWeekCount: laterEvents.length, events: formatted }, fromMerge: true } }];"
+        "jsCode": "const events = $input.all();\nconst allToolCalls = $('Prepare Calendar').first().json._toolCalls;\nconst today = new Date();\ntoday.setHours(0, 0, 0, 0);\n\nconst formatted = events.map(e => {\n  const startStr = e.json.start?.dateTime || e.json.start?.date;\n  const startDate = startStr ? new Date(startStr) : null;\n  const dayOfWeek = startDate ? startDate.toLocaleDateString('en-US', { weekday: 'long' }) : null;\n  const dateOnly = startDate ? startDate.toISOString().split('T')[0] : null;\n  const eventDay = startDate ? new Date(startDate) : null;\n  if (eventDay) eventDay.setHours(0, 0, 0, 0);\n  const isToday = eventDay && eventDay.getTime() === today.getTime();\n  return {\n    title: e.json.summary || 'No title',\n    start: startStr,\n    end: e.json.end?.dateTime || e.json.end?.date,\n    date: dateOnly,\n    dayOfWeek,\n    isToday,\n    location: e.json.location || null,\n    attendees: (e.json.attendees || []).map(a => a.email).slice(0, 5)\n  };\n});\n\nconst todayEvents = formatted.filter(e => e.isToday);\nconst laterEvents = formatted.filter(e => !e.isToday);\nconst result = { totalEventCount: formatted.length, todayEventCount: todayEvents.length, laterThisWeekCount: laterEvents.length, events: formatted };\n\nreturn allToolCalls.map(tc => ({ json: { toolCallId: tc.id, toolName: 'get-calendar-events', result, fromMerge: true } }));"
       },
       "id": "format-calendar",
       "name": "Format Calendar",
@@ -414,7 +414,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Prepare for Gmail - store tool call info\nconst toolCall = $input.first().json;\nreturn [{ json: { _toolCall: toolCall } }];"
+        "jsCode": "// Prepare for Gmail - store all tool call info (Pattern A: API-based)\nconst items = $input.all();\nreturn [{ json: { _toolCalls: items.map(i => i.json) } }];"
       },
       "id": "prepare-emails",
       "name": "Prepare Emails",
@@ -453,7 +453,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const rawEmails = $input.all();\nconst toolCall = $('Prepare Emails').first().json._toolCall;\nconst now = new Date();\nconst myEmail = 'tm@legacyco2.com';\n\n// Filter out empty objects (Gmail returns [{}] when no results)\nconst emails = rawEmails.filter(e => e.json && e.json.id);\n\nconst formatted = emails.map(e => {\n  // Handle both header formats: direct fields or payload.headers array\n  const from = e.json.From || e.json.from || 'Unknown';\n  const subject = e.json.Subject || e.json.subject || 'No subject';\n  \n  // Parse date from internalDate (milliseconds timestamp)\n  const internalDate = e.json.internalDate ? parseInt(e.json.internalDate) : null;\n  const emailDate = internalDate ? new Date(internalDate) : null;\n  const ageInDays = emailDate ? Math.floor((now - emailDate) / 86400000) : null;\n  \n  // Check labels - can be array of objects {id, name} or array of strings\n  const labels = e.json.labels || [];\n  const hasLabel = (labelName) => labels.some(l => (l.id || l) === labelName);\n  \n  const fromLower = from.toLowerCase();\n  const isUnread = hasLabel('UNREAD');\n  const isFromMe = fromLower.includes(myEmail);\n  const needsReply = isUnread && !isFromMe;\n  \n  return {\n    from,\n    subject,\n    date: emailDate ? emailDate.toISOString() : null,\n    ageInDays,\n    snippet: e.json.snippet || '',\n    isUnread,\n    isImportant: hasLabel('IMPORTANT'),\n    isStarred: hasLabel('STARRED'),\n    needsReply\n  };\n});\n\nconst unreadCount = formatted.filter(e => e.isUnread).length;\nconst needsReplyCount = formatted.filter(e => e.needsReply).length;\n\nreturn [{ json: { toolCallId: toolCall.id, toolName: 'get-emails', result: { emailCount: formatted.length, unreadCount, needsReplyCount, emails: formatted }, fromMerge: true } }];"
+        "jsCode": "const rawEmails = $input.all();\nconst allToolCalls = $('Prepare Emails').first().json._toolCalls;\nconst now = new Date();\nconst myEmail = 'tm@legacyco2.com';\n\nconst emails = rawEmails.filter(e => e.json && e.json.id);\n\nconst formatted = emails.map(e => {\n  const from = e.json.From || e.json.from || 'Unknown';\n  const subject = e.json.Subject || e.json.subject || 'No subject';\n  const internalDate = e.json.internalDate ? parseInt(e.json.internalDate) : null;\n  const emailDate = internalDate ? new Date(internalDate) : null;\n  const ageInDays = emailDate ? Math.floor((now - emailDate) / 86400000) : null;\n  const labels = e.json.labels || [];\n  const hasLabel = (labelName) => labels.some(l => (l.id || l) === labelName);\n  const fromLower = from.toLowerCase();\n  const isUnread = hasLabel('UNREAD');\n  const isFromMe = fromLower.includes(myEmail);\n  const needsReply = isUnread && !isFromMe;\n  return { from, subject, date: emailDate ? emailDate.toISOString() : null, ageInDays, snippet: e.json.snippet || '', isUnread, isImportant: hasLabel('IMPORTANT'), isStarred: hasLabel('STARRED'), needsReply };\n});\n\nconst unreadCount = formatted.filter(e => e.isUnread).length;\nconst needsReplyCount = formatted.filter(e => e.needsReply).length;\nconst result = { emailCount: formatted.length, unreadCount, needsReplyCount, emails: formatted };\n\nreturn allToolCalls.map(tc => ({ json: { toolCallId: tc.id, toolName: 'get-emails', result, fromMerge: true } }));"
       },
       "id": "format-emails",
       "name": "Format Emails",
@@ -466,7 +466,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Prepare for Slack - store tool call info\nconst toolCall = $input.first().json;\nreturn [{ json: { _toolCall: toolCall } }];"
+        "jsCode": "// Prepare for Slack - store all tool call info (Pattern A: API-based)\nconst items = $input.all();\nreturn [{ json: { _toolCalls: items.map(i => i.json) } }];"
       },
       "id": "prepare-slack",
       "name": "Prepare Slack",
@@ -504,7 +504,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const messages = $input.all();\nconst toolCall = $('Prepare Slack').first().json._toolCall;\nconst now = Date.now();\n\nconst formatted = messages.filter(m => m.json.text).map(m => {\n  const ts = m.json.ts ? parseFloat(m.json.ts) * 1000 : null;\n  const ageInHours = ts ? Math.round((now - ts) / 3600000) : null;\n  return {\n    channel: m.json.channel?.name || 'DM',\n    sender: m.json.user_profile?.real_name || m.json.user || 'Unknown',\n    text: m.json.text || '',\n    timestamp: ts ? new Date(ts).toISOString() : null,\n    ageInHours\n  };\n});\n\nconst recentCount = formatted.filter(m => m.ageInHours !== null && m.ageInHours <= 24).length;\n\nreturn [{ json: { toolCallId: toolCall.id, toolName: 'get-slack-messages', result: { messageCount: formatted.length, recentCount, messages: formatted }, fromMerge: true } }];"
+        "jsCode": "const messages = $input.all();\nconst allToolCalls = $('Prepare Slack').first().json._toolCalls;\nconst now = Date.now();\n\nconst formatted = messages.filter(m => m.json.text).map(m => {\n  const ts = m.json.ts ? parseFloat(m.json.ts) * 1000 : null;\n  const ageInHours = ts ? Math.round((now - ts) / 3600000) : null;\n  return {\n    channel: m.json.channel?.name || 'DM',\n    sender: m.json.user_profile?.real_name || m.json.user || 'Unknown',\n    text: m.json.text || '',\n    timestamp: ts ? new Date(ts).toISOString() : null,\n    ageInHours\n  };\n});\n\nconst recentCount = formatted.filter(m => m.ageInHours !== null && m.ageInHours <= 24).length;\nconst result = { messageCount: formatted.length, recentCount, messages: formatted };\n\nreturn allToolCalls.map(tc => ({ json: { toolCallId: tc.id, toolName: 'get-slack-messages', result, fromMerge: true } }));"
       },
       "id": "format-slack",
       "name": "Format Slack",
@@ -517,7 +517,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Prepare for Todoist - store tool call info\nconst toolCall = $input.first().json;\nreturn [{ json: { _toolCall: toolCall } }];"
+        "jsCode": "// Prepare for Todoist - store all tool call info (Pattern A: API-based)\nconst items = $input.all();\nreturn [{ json: { _toolCalls: items.map(i => i.json) } }];"
       },
       "id": "prepare-tasks",
       "name": "Prepare Tasks",
@@ -554,7 +554,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const tasks = $input.all();\nconst toolCall = $('Prepare Tasks').first().json._toolCall;\nconst today = new Date();\nconst STALE_DAYS = 7;\n\nconst formatted = tasks.map(t => {\n  const created = t.json.created_at ? new Date(t.json.created_at) : null;\n  const ageInDays = created ? Math.floor((today - created) / 86400000) : null;\n  return {\n    content: t.json.content,\n    due: t.json.due?.date || 'Today',\n    priority: t.json.priority,\n    project: t.json.project?.name || null,\n    ageInDays,\n    isStale: ageInDays !== null && ageInDays >= STALE_DAYS\n  };\n});\n\nconst staleCount = formatted.filter(t => t.isStale).length;\n\nreturn [{ json: { toolCallId: toolCall.id, toolName: 'get-todoist-tasks', result: { taskCount: formatted.length, staleTaskCount: staleCount, tasks: formatted }, fromMerge: true } }];"
+        "jsCode": "const tasks = $input.all();\nconst allToolCalls = $('Prepare Tasks').first().json._toolCalls;\nconst today = new Date();\nconst STALE_DAYS = 7;\n\nconst formatted = tasks.map(t => {\n  const created = t.json.created_at ? new Date(t.json.created_at) : null;\n  const ageInDays = created ? Math.floor((today - created) / 86400000) : null;\n  return {\n    content: t.json.content,\n    due: t.json.due?.date || 'Today',\n    priority: t.json.priority,\n    project: t.json.project?.name || null,\n    ageInDays,\n    isStale: ageInDays !== null && ageInDays >= STALE_DAYS\n  };\n});\n\nconst staleCount = formatted.filter(t => t.isStale).length;\nconst result = { taskCount: formatted.length, staleTaskCount: staleCount, tasks: formatted };\n\nreturn allToolCalls.map(tc => ({ json: { toolCallId: tc.id, toolName: 'get-todoist-tasks', result, fromMerge: true } }));"
       },
       "id": "format-tasks",
       "name": "Format Tasks",
@@ -567,7 +567,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Prepare for MCP notion-search\nconst toolCall = $input.first().json;\nreturn [{ json: { query: toolCall.input.query, _toolCall: toolCall } }];"
+        "jsCode": "// Prepare for MCP notion-search (Pattern B: MCP-based, each call has different params)\nconst items = $input.all();\nreturn items.map(item => ({ json: { query: item.json.input.query, _toolCall: item.json } }));"
       },
       "id": "prepare-notion-search",
       "name": "Prepare Notion Search",
@@ -610,7 +610,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const searchResult = $input.first().json;\nconst toolCall = $('Prepare Notion Search').first().json._toolCall;\n\nlet results = [];\nif (searchResult.content && Array.isArray(searchResult.content)) {\n  for (const c of searchResult.content) {\n    if (c.type === 'text') {\n      try {\n        const parsed = JSON.parse(c.text);\n        if (Array.isArray(parsed)) {\n          results = parsed.map(r => ({ id: r.id, title: r.title || 'Untitled', url: r.url }));\n        }\n      } catch (e) {\n        results = [{ text: c.text }];\n      }\n    }\n  }\n}\n\nreturn [{ json: { toolCallId: toolCall.id, toolName: 'notion-search', result: { resultCount: results.length, results: results.slice(0, 10) }, fromMerge: true } }];"
+        "jsCode": "const allResults = $input.all();\nconst prepareItems = $('Prepare Notion Search').all();\n\nreturn allResults.map((item, index) => {\n  const searchResult = item.json;\n  const toolCall = prepareItems[index]?.json._toolCall || prepareItems[0]?.json._toolCall;\n\n  let results = [];\n  if (searchResult.content && Array.isArray(searchResult.content)) {\n    for (const c of searchResult.content) {\n      if (c.type === 'text') {\n        try {\n          const parsed = JSON.parse(c.text);\n          if (Array.isArray(parsed)) {\n            results = parsed.map(r => ({ id: r.id, title: r.title || 'Untitled', url: r.url }));\n          }\n        } catch (e) {\n          results = [{ text: c.text }];\n        }\n      }\n    }\n  }\n\n  return { json: { toolCallId: toolCall.id, toolName: 'notion-search', result: { resultCount: results.length, results: results.slice(0, 10) }, fromMerge: true } };\n});"
       },
       "id": "format-notion-search",
       "name": "Format Notion Search",
@@ -623,7 +623,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Prepare for MCP notion-fetch\nconst toolCall = $input.first().json;\nreturn [{ json: { id: toolCall.input.id, type: 'page', _toolCall: toolCall } }];"
+        "jsCode": "// Prepare for MCP notion-fetch (Pattern B: MCP-based, each call has different params)\nconst items = $input.all();\nreturn items.map(item => ({ json: { id: item.json.input.id, type: 'page', _toolCall: item.json } }));"
       },
       "id": "prepare-notion-fetch",
       "name": "Prepare Notion Fetch",
@@ -666,7 +666,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const fetchResult = $input.first().json;\nconst toolCall = $('Prepare Notion Fetch').first().json._toolCall;\n\nlet content = '', title = '', url = '';\nif (fetchResult.content && Array.isArray(fetchResult.content)) {\n  for (const c of fetchResult.content) {\n    if (c.type === 'text' && c.text) {\n      const textObj = c.text;\n      if (typeof textObj === 'string') content = textObj;\n      else { title = textObj.title || title; url = textObj.url || url; content = textObj.text || content; }\n    }\n  }\n}\ncontent = String(content || '').substring(0, 2000);\n\nreturn [{ json: { toolCallId: toolCall.id, toolName: 'notion-fetch', result: { title: title || '(Untitled)', url: url || '', content: content || '(No content)' }, fromMerge: true } }];"
+        "jsCode": "const allResults = $input.all();\nconst prepareItems = $('Prepare Notion Fetch').all();\n\nreturn allResults.map((item, index) => {\n  const fetchResult = item.json;\n  const toolCall = prepareItems[index]?.json._toolCall || prepareItems[0]?.json._toolCall;\n\n  let content = '', title = '', url = '';\n  if (fetchResult.content && Array.isArray(fetchResult.content)) {\n    for (const c of fetchResult.content) {\n      if (c.type === 'text' && c.text) {\n        const textObj = c.text;\n        if (typeof textObj === 'string') content = textObj;\n        else { title = textObj.title || title; url = textObj.url || url; content = textObj.text || content; }\n      }\n    }\n  }\n  content = String(content || '').substring(0, 2000);\n\n  return { json: { toolCallId: toolCall.id, toolName: 'notion-fetch', result: { title: title || '(Untitled)', url: url || '', content: content || '(No content)' }, fromMerge: true } };\n});"
       },
       "id": "format-notion-fetch",
       "name": "Format Notion Fetch",
@@ -710,35 +710,25 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.elevenlabs.io/v1/text-to-speech/onwK4e9ZLuTAKqWW03F9",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "url": "https://texttospeech.googleapis.com/v1/text:synthesize",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCloudStorageOAuth2Api",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Content-Type",
               "value": "application/json"
-            },
-            {
-              "name": "Accept",
-              "value": "audio/mpeg"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"text\": {{ JSON.stringify($json.script) }},\n  \"model_id\": \"eleven_multilingual_v2\",\n  \"voice_settings\": {\n    \"stability\": 0.6,\n    \"similarity_boost\": 0.75,\n    \"style\": 0.3,\n    \"speed\": 1.15,\n    \"use_speaker_boost\": true\n  }\n}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file"
-            }
-          }
-        }
+        "jsonBody": "={\n  \"input\": { \"text\": {{ JSON.stringify($json.script) }} },\n  \"voice\": {\n    \"languageCode\": \"en-US\",\n    \"name\": \"en-US-Neural2-D\"\n  },\n  \"audioConfig\": {\n    \"audioEncoding\": \"MP3\",\n    \"speakingRate\": 1.15\n  }\n}",
+        "options": {}
       },
-      "id": "elevenlabs-tts",
-      "name": "ElevenLabs TTS",
+      "id": "google-cloud-tts",
+      "name": "Google Cloud TTS",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -750,11 +740,27 @@
       "maxTries": 2,
       "waitBetweenTries": 2000,
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "QUVrU7I55RQ8mhTR",
-          "name": "ElevenLabs API"
+        "googleCloudStorageOAuth2Api": {
+          "id": "mUq2jQi5KHAHHb8R",
+          "name": "Google Cloud Storage account"
         }
-      }
+      },
+      "notes": "Google Cloud Text-to-Speech API"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Convert TTS Response - Extract base64 audio and convert to binary MP3\n */\nconst response = $input.first().json;\n\n// Check for API errors\nif (response.error) {\n  return [{ json: { error: response.error?.message || response.error || 'TTS API error' } }];\n}\n\nconst audioContent = response.audioContent;\nif (!audioContent) {\n  return [{ json: { error: 'No audioContent in TTS response' } }];\n}\n\nreturn [{\n  json: { success: true, size: Buffer.from(audioContent, 'base64').length },\n  binary: {\n    data: {\n      data: audioContent,\n      mimeType: 'audio/mpeg',\n      fileName: 'briefing.mp3'\n    }\n  }\n}];"
+      },
+      "id": "convert-tts-to-binary",
+      "name": "Convert TTS to Binary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        960
+      ],
+      "continueOnFail": true,
+      "notes": "Convert base64 audio response to binary MP3"
     },
     {
       "parameters": {
@@ -788,6 +794,43 @@
     },
     {
       "parameters": {
+        "jsCode": "/**\n * Verify MP3 Upload - Validate Upload MP3 result and construct public URL\n */\nconst mp3Upload = $('Upload MP3').first().json;\nconst episode = $('Extract Briefing').first().json;\nconst gcsBucket = episode.gcsBucket || 'morning-briefing-podcast-dev';\n\n// If Upload MP3 errored, fail early\nif (!mp3Upload.name || mp3Upload.error) {\n  return [{ json: { uploadVerified: false, error: mp3Upload.error || 'Upload MP3 returned no filename', mp3Url: 'https://invalid.local/upload-failed' } }];\n}\n\n// Check file size from GCS response (should be at least 10KB for a real MP3)\nif (mp3Upload.size && parseInt(mp3Upload.size) < 10000) {\n  return [{ json: { uploadVerified: false, error: `MP3 file too small (${mp3Upload.size} bytes) - likely corrupt`, mp3Url: 'https://invalid.local/upload-failed' } }];\n}\n\nconst mp3Url = `https://storage.googleapis.com/${gcsBucket}/${mp3Upload.name}`;\n\n// Basic validation passed - HEAD Check will confirm public accessibility\nreturn [{ json: { uploadVerified: true, mp3Url, fileSize: parseInt(mp3Upload.size || '0') } }];"
+      },
+      "id": "verify-mp3-upload",
+      "name": "Verify MP3 Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2020,
+        960
+      ],
+      "notes": "Validate Upload MP3 result and construct URL"
+    },
+    {
+      "parameters": {
+        "method": "HEAD",
+        "url": "={{ $json.mp3Url }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "head-check-mp3",
+      "name": "HEAD Check MP3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2100,
+        960
+      ],
+      "continueOnFail": true,
+      "notes": "HEAD request to verify MP3 is publicly accessible"
+    },
+    {
+      "parameters": {
         "resource": "object",
         "operation": "get",
         "bucketName": "morning-briefing-podcast-dev",
@@ -817,7 +860,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const existingFeed = $('Download RSS').first();\nconst episode = $('Extract Briefing').first().json;\nconst mp3Upload = $('Upload MP3').first().json;\nconst gcsBucket = episode.gcsBucket || 'morning-briefing-podcast-dev';\n\n// Always use the public URL format for podcast feeds (not mediaLink which is authenticated)\nconst mp3Url = `https://storage.googleapis.com/${gcsBucket}/${mp3Upload.name}`;\nconst fileSize = mp3Upload.size || 0;\nconst pubDate = new Date().toUTCString();\n\nfunction escapeXml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/'/g, '&apos;'); }\nfunction getEpisodeNumber() { const startDate = new Date('2026-01-01'); return Math.floor((new Date() - startDate) / 86400000) + 1; }\n\nconst newEpisode = `    <item>\n      <title>${escapeXml(episode.episodeTitle)}</title>\n      <description><![CDATA[${episode.description}]]></description>\n      <enclosure url=\"${mp3Url}\" length=\"${fileSize}\" type=\"audio/mpeg\"/>\n      <guid isPermaLink=\"true\">${mp3Url}</guid>\n      <pubDate>${pubDate}</pubDate>\n      <itunes:duration>${episode.estimatedMinutes * 60}</itunes:duration>\n      <itunes:episode>${getEpisodeNumber()}</itunes:episode>\n    </item>`;\n\nlet feedXml = '';\nlet existingData = '';\nif (existingFeed.json?.data) existingData = existingFeed.json.data;\nelse if (existingFeed.binary?.data) existingData = Buffer.from(existingFeed.binary.data.data, 'base64').toString('utf8');\n\nif (existingData && existingData.includes('<channel>')) {\n  feedXml = existingData;\n  const itemMatch = feedXml.match(/<item>/);\n  const channelEndMatch = feedXml.match(/<\\/channel>/);\n  if (itemMatch) feedXml = feedXml.slice(0, itemMatch.index) + newEpisode + '\\n' + feedXml.slice(itemMatch.index);\n  else if (channelEndMatch) feedXml = feedXml.slice(0, channelEndMatch.index) + newEpisode + '\\n  ' + feedXml.slice(channelEndMatch.index);\n  feedXml = feedXml.replace(/<lastBuildDate>[^<]*<\\/lastBuildDate>/, `<lastBuildDate>${pubDate}</lastBuildDate>`);\n} else {\n  feedXml = `<?xml version=\"1.0\" encoding=\"UTF-8\"?>\\n<rss version=\"2.0\" xmlns:itunes=\"http://www.itunes.com/dtds/podcast-1.0.dtd\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\\n  <channel>\\n    <title>My Morning Briefing</title>\\n    <description>Personal daily morning briefing podcast</description>\\n    <link>https://storage.googleapis.com/${gcsBucket}/</link>\\n    <language>en-us</language>\\n    <lastBuildDate>${pubDate}</lastBuildDate>\\n    <atom:link href=\"https://storage.googleapis.com/${gcsBucket}/feed.xml\" rel=\"self\" type=\"application/rss+xml\"/>\\n    <itunes:author>Morning Briefing</itunes:author>\\n    <itunes:summary>Personal daily morning briefing podcast</itunes:summary>\\n    <itunes:category text=\"Daily News\"/>\\n    <itunes:explicit>false</itunes:explicit>\\n    <itunes:image href=\"https://storage.googleapis.com/${gcsBucket}/cover.jpg\"/>\\n${newEpisode}\\n  </channel>\\n</rss>`;\n}\n\nreturn { json: { feedXml, episodeAdded: episode.episodeTitle, mp3Url } };"
+        "jsCode": "const existingFeed = $('Download RSS').first();\nconst episode = $('Extract Briefing').first().json;\nconst verifyResult = $('Verify MP3 Upload').first().json;\nconst headCheck = $('HEAD Check MP3').first().json;\nconst gcsBucket = episode.gcsBucket || 'morning-briefing-podcast-dev';\n\n// Check if basic Upload MP3 validation failed\nif (!verifyResult.uploadVerified) {\n  return { json: { feedXml: null, episodeAdded: null, mp3Url: null, uploadFailed: true, error: verifyResult.error || 'MP3 upload verification failed' } };\n}\n\n// Check if HEAD request failed (file not publicly accessible)\nif (headCheck.error || (headCheck.statusCode && headCheck.statusCode >= 400)) {\n  const headError = headCheck.error?.message || headCheck.error || `HEAD returned status ${headCheck.statusCode}`;\n  return { json: { feedXml: null, episodeAdded: null, mp3Url: null, uploadFailed: true, error: `MP3 not publicly accessible: ${headError}` } };\n}\n\nconst mp3Url = verifyResult.mp3Url;\nconst fileSize = verifyResult.fileSize || $('Upload MP3').first().json.size || 0;\nconst pubDate = new Date().toUTCString();\n\nfunction escapeXml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/'/g, '&apos;'); }\nfunction getEpisodeNumber() { const startDate = new Date('2026-01-01'); return Math.floor((new Date() - startDate) / 86400000) + 1; }\n\nconst newEpisode = `    <item>\n      <title>${escapeXml(episode.episodeTitle)}</title>\n      <description><![CDATA[${episode.description}]]></description>\n      <enclosure url=\"${mp3Url}\" length=\"${fileSize}\" type=\"audio/mpeg\"/>\n      <guid isPermaLink=\"true\">${mp3Url}</guid>\n      <pubDate>${pubDate}</pubDate>\n      <itunes:duration>${episode.estimatedMinutes * 60}</itunes:duration>\n      <itunes:episode>${getEpisodeNumber()}</itunes:episode>\n    </item>`;\n\nlet feedXml = '';\nlet existingData = '';\nif (existingFeed.json?.data) existingData = existingFeed.json.data;\nelse if (existingFeed.binary?.data) existingData = Buffer.from(existingFeed.binary.data.data, 'base64').toString('utf8');\n\nif (existingData && existingData.includes('<channel>')) {\n  feedXml = existingData;\n  const itemMatch = feedXml.match(/<item>/);\n  const channelEndMatch = feedXml.match(/<\\/channel>/);\n  if (itemMatch) feedXml = feedXml.slice(0, itemMatch.index) + newEpisode + '\\n' + feedXml.slice(itemMatch.index);\n  else if (channelEndMatch) feedXml = feedXml.slice(0, channelEndMatch.index) + newEpisode + '\\n  ' + feedXml.slice(channelEndMatch.index);\n  feedXml = feedXml.replace(/<lastBuildDate>[^<]*<\\/lastBuildDate>/, `<lastBuildDate>${pubDate}</lastBuildDate>`);\n} else {\n  // Check if Download RSS errored - if so, don't create a new feed (prevents data loss)\n  const downloadRss = existingFeed.json;\n  if (downloadRss?.error) {\n    return { json: { feedXml: null, uploadFailed: true, error: 'Could not download existing feed - aborting to prevent data loss' } };\n  }\n  // Genuinely first episode - create new feed\n  feedXml = `<?xml version=\"1.0\" encoding=\"UTF-8\"?>\\n<rss version=\"2.0\" xmlns:itunes=\"http://www.itunes.com/dtds/podcast-1.0.dtd\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\\n  <channel>\\n    <title>My Morning Briefing</title>\\n    <description>Personal daily morning briefing podcast</description>\\n    <link>https://storage.googleapis.com/${gcsBucket}/</link>\\n    <language>en-us</language>\\n    <lastBuildDate>${pubDate}</lastBuildDate>\\n    <atom:link href=\"https://storage.googleapis.com/${gcsBucket}/feed.xml\" rel=\"self\" type=\"application/rss+xml\"/>\\n    <itunes:author>Morning Briefing</itunes:author>\\n    <itunes:summary>Personal daily morning briefing podcast</itunes:summary>\\n    <itunes:category text=\"Daily News\"/>\\n    <itunes:explicit>false</itunes:explicit>\\n    <itunes:image href=\"https://storage.googleapis.com/${gcsBucket}/cover.jpg\"/>\\n${newEpisode}\\n  </channel>\\n</rss>`;\n}\n\nreturn { json: { feedXml, episodeAdded: episode.episodeTitle, mp3Url } };"
       },
       "id": "update-rss",
       "name": "Update RSS",
@@ -830,7 +873,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const feedXml = $input.first().json.feedXml;\nconst episodeAdded = $input.first().json.episodeAdded;\nconst mp3Url = $input.first().json.mp3Url;\nconst binaryData = Buffer.from(feedXml, 'utf8');\n\nreturn { json: { episodeAdded, mp3Url, feedSize: binaryData.length }, binary: { data: { data: binaryData.toString('base64'), mimeType: 'application/rss+xml', fileName: 'feed.xml' } } };"
+        "jsCode": "const input = $input.first().json;\n\n// If upload failed, skip RSS update\nif (input.uploadFailed) {\n  return { json: { skipped: true, error: input.error } };\n}\n\nconst feedXml = input.feedXml;\nconst episodeAdded = input.episodeAdded;\nconst mp3Url = input.mp3Url;\nconst binaryData = Buffer.from(feedXml, 'utf8');\n\nreturn { json: { episodeAdded, mp3Url, feedSize: binaryData.length }, binary: { data: { data: binaryData.toString('base64'), mimeType: 'application/rss+xml', fileName: 'feed.xml' } } };"
       },
       "id": "prepare-rss-upload",
       "name": "Prepare RSS Upload",
@@ -932,7 +975,7 @@
     },
     {
       "parameters": {
-        "jsCode": "/**\n * Check for Errors - Detect upstream failures and prepare alert data\n */\nconst ttsResult = $('ElevenLabs TTS').first();\nconst uploadMp3Result = $('Upload MP3').first();\nconst extractBriefing = $('Extract Briefing').first().json;\n\nconst errors = [];\n\n// Check TTS errors\nif (ttsResult.json?.error || !ttsResult.binary?.data) {\n  errors.push({\n    step: 'ElevenLabs TTS',\n    message: ttsResult.json?.error?.message || ttsResult.json?.message || 'Failed to generate audio'\n  });\n}\n\n// Check MP3 upload errors\nif (uploadMp3Result.json?.error) {\n  errors.push({\n    step: 'Upload MP3',\n    message: uploadMp3Result.json?.error?.message || 'Failed to upload MP3 to GCS'\n  });\n}\n\n// Check for workflow-level errors (timeout, max iterations)\nif (extractBriefing.exitReason === 'timeout' || extractBriefing.exitReason === 'max_iterations_reached') {\n  errors.push({\n    step: 'Agent Loop',\n    message: `Workflow ended due to: ${extractBriefing.exitReason}`\n  });\n}\n\nif (errors.length > 0) {\n  const errorSummary = errors.map(e => `• *${e.step}*: ${e.message}`).join('\\n');\n  return [{\n    json: {\n      hasError: true,\n      errorCount: errors.length,\n      errors,\n      errorSummary,\n      timestamp: new Date().toISOString()\n    }\n  }];\n}\n\n// No errors - pass through success data\nreturn [{\n  json: {\n    hasError: false,\n    episodeTitle: extractBriefing.episodeTitle,\n    mp3Url: uploadMp3Result.json?.mediaLink || 'Unknown'\n  }\n}];"
+        "jsCode": "/**\n * Check for Errors - Detect upstream failures and prepare alert data\n */\nconst ttsResult = $('Convert TTS to Binary').first();\nconst uploadMp3Result = $('Upload MP3').first();\nconst verifyMp3Result = $('Verify MP3 Upload').first();\nconst headCheckResult = $('HEAD Check MP3').first();\nconst updateRssResult = $('Update RSS').first();\nconst uploadRssResult = $('Upload RSS').first();\nconst extractBriefing = $('Extract Briefing').first().json;\n\nconst errors = [];\n\n// Check TTS errors\nif (ttsResult.json?.error || !ttsResult.binary?.data) {\n  errors.push({\n    step: 'Google Cloud TTS',\n    message: ttsResult.json?.error?.message || ttsResult.json?.message || 'Failed to generate audio'\n  });\n}\n\n// Check MP3 upload errors\nif (uploadMp3Result.json?.error) {\n  errors.push({\n    step: 'Upload MP3',\n    message: uploadMp3Result.json?.error?.message || 'Failed to upload MP3 to GCS'\n  });\n}\n\n// Check MP3 basic validation\nif (verifyMp3Result.json && !verifyMp3Result.json.uploadVerified) {\n  errors.push({\n    step: 'Verify MP3 Upload',\n    message: verifyMp3Result.json.error || 'MP3 upload validation failed'\n  });\n}\n\n// Check HEAD verification (only if basic validation passed)\nif (verifyMp3Result.json?.uploadVerified && (headCheckResult.json?.error || (headCheckResult.json?.statusCode && headCheckResult.json.statusCode >= 400))) {\n  errors.push({\n    step: 'HEAD Check MP3',\n    message: headCheckResult.json?.error?.message || headCheckResult.json?.error || `MP3 not publicly accessible (status ${headCheckResult.json?.statusCode})`\n  });\n}\n\n// Check if RSS update was skipped due to upstream failure\nif (updateRssResult.json?.uploadFailed) {\n  errors.push({\n    step: 'RSS Update',\n    message: updateRssResult.json?.error || 'RSS update skipped due to upstream failure'\n  });\n}\n\n// Check RSS upload errors\nif (uploadRssResult.json?.error) {\n  errors.push({\n    step: 'Upload RSS',\n    message: uploadRssResult.json?.error?.message || uploadRssResult.json?.error || 'Failed to upload feed.xml'\n  });\n}\n\n// Check for workflow-level errors (timeout, max iterations)\nif (extractBriefing.exitReason === 'timeout' || extractBriefing.exitReason === 'max_iterations_reached') {\n  errors.push({\n    step: 'Agent Loop',\n    message: `Workflow ended due to: ${extractBriefing.exitReason}`\n  });\n}\n\nif (errors.length > 0) {\n  const errorSummary = errors.map(e => `• *${e.step}*: ${e.message}`).join('\\n');\n  return [{\n    json: {\n      hasError: true,\n      errorCount: errors.length,\n      errors,\n      errorSummary,\n      timestamp: new Date().toISOString()\n    }\n  }];\n}\n\n// No errors - pass through success data\nreturn [{\n  json: {\n    hasError: false,\n    episodeTitle: extractBriefing.episodeTitle,\n    mp3Url: verifyMp3Result.json?.mp3Url || uploadMp3Result.json?.mediaLink || 'Unknown'\n  }\n}];"
       },
       "id": "check-errors",
       "name": "Check Errors",
@@ -1003,7 +1046,23 @@
           "name": "Slack account 2"
         }
       },
-      "notes": "Alert Tobias on failure"
+      "notes": "Alert Tobias on failure",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "errorType": "errorMessage",
+        "errorMessage": "=Morning briefing failed: {{ $('Check Errors').first().json.errorSummary }}"
+      },
+      "id": "stop-and-error",
+      "name": "Stop and Error",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        2880,
+        1120
+      ],
+      "notes": "Mark execution as failed"
     }
   ],
   "connections": {
@@ -1383,7 +1442,7 @@
       "main": [
         [
           {
-            "node": "ElevenLabs TTS",
+            "node": "Google Cloud TTS",
             "type": "main",
             "index": 0
           },
@@ -1406,7 +1465,18 @@
         ]
       ]
     },
-    "ElevenLabs TTS": {
+    "Google Cloud TTS": {
+      "main": [
+        [
+          {
+            "node": "Convert TTS to Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert TTS to Binary": {
       "main": [
         [
           {
@@ -1418,6 +1488,28 @@
       ]
     },
     "Upload MP3": {
+      "main": [
+        [
+          {
+            "node": "Verify MP3 Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify MP3 Upload": {
+      "main": [
+        [
+          {
+            "node": "HEAD Check MP3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HEAD Check MP3": {
       "main": [
         [
           {
@@ -1498,6 +1590,17 @@
           }
         ],
         []
+      ]
+    },
+    "Slack Error Alert": {
+      "main": [
+        [
+          {
+            "node": "Stop and Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
